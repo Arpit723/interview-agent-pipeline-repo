@@ -6,18 +6,37 @@
 const express = require('express');
 const router = express.Router();
 
+const { generateQuestions } = require('../agents/interviewerAgent');
+const { evaluateAnswer } = require('../agents/evaluatorAgent');
+
 // FR2 - Interviewer Agent (Day 2)
 router.post('/questions', async (req, res) => {
-  // const { jobDescription } = req.body;
-  // TODO Day 2: call generateQuestions(jobDescription) from agents/interviewerAgent.js
-  res.json({ status: 'not_implemented_yet', route: '/api/questions' });
+  const { jobDescription } = req.body;
+  if (!jobDescription) {
+    return res.status(400).json({ error: 'jobDescription is required' });
+  }
+  try {
+    const result = await generateQuestions(jobDescription);
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to generate questions' });
+  }
 });
 
 // FR4 - Evaluator Agent (Day 2)
 router.post('/evaluate', async (req, res) => {
-  // const { question, answer } = req.body;
-  // TODO Day 2: call evaluateAnswer(question, answer) from agents/evaluatorAgent.js
-  res.json({ status: 'not_implemented_yet', route: '/api/evaluate' });
+  const { question, answer } = req.body;
+  if (!question || !answer) {
+    return res.status(400).json({ error: 'question and answer are required' });
+  }
+  try {
+    const result = await evaluateAnswer(question, answer);
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to evaluate answer' });
+  }
 });
 
 // FR5 - Coach Agent (Day 3)
