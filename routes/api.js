@@ -9,6 +9,7 @@ const router = express.Router();
 const { generateQuestions } = require('../agents/interviewerAgent');
 const { evaluateAnswer } = require('../agents/evaluatorAgent');
 const { coachAnswer } = require('../agents/coachAgent');
+const { summarizeProgress } = require('../agents/memoryAgent');
 
 const db = require('../db/init');
 
@@ -20,6 +21,7 @@ const insertQaPair = db.prepare(`
     (@session_id, @question, @question_type, @answer, @score_technical, @score_structure, @score_clarity, @weak_areas)
 `);
 const updateQaPair = db.prepare('UPDATE qa_pairs SET feedback = ?, model_answer = ? WHERE id = ?');
+const getAllQaPairs = db.prepare('SELECT * FROM qa_pairs');
 
 // FR2 - Interviewer Agent (Day 2)
 router.post('/questions', async (req, res) => {
@@ -80,8 +82,25 @@ router.post('/coach', async (req, res) => {
 
 // FR7 - Memory Agent + session history (Day 4)
 router.get('/history', async (req, res) => {
-  // TODO Day 4: read past sessions from SQLite, call summarizeProgress()
-  res.json({ status: 'not_implemented_yet', route: '/api/history' });
+  try {
+    const rows = getAllQaPairs.all();
+    if (rows.length === 0) {
+      return res.json({ message: 'No sessions yet' });
+    }
+    const pastSessions = rows.map((row) => ({
+      scores: {
+        technical_accuracy: row.score_technical,
+        structure: row.score_structure,
+        clarity: row.score_clarity,
+      },
+      weak_areas: JSON.parse(row.weak_areas),
+    }));
+    const result = await summarizeProgress(pastSessions);
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to summarize progress' });
+  }
 });
 
 module.exports = router;
