@@ -8,6 +8,7 @@ const router = express.Router();
 
 const { generateQuestions } = require('../agents/interviewerAgent');
 const { evaluateAnswer } = require('../agents/evaluatorAgent');
+const { coachAnswer } = require('../agents/coachAgent');
 
 // FR2 - Interviewer Agent (Day 2)
 router.post('/questions', async (req, res) => {
@@ -41,9 +42,17 @@ router.post('/evaluate', async (req, res) => {
 
 // FR5 - Coach Agent (Day 3)
 router.post('/coach', async (req, res) => {
-  // const { question, answer, evaluation } = req.body;
-  // TODO Day 3: call coachAnswer(question, answer, evaluation) from agents/coachAgent.js
-  res.json({ status: 'not_implemented_yet', route: '/api/coach' });
+  const { question, answer, evaluation } = req.body;
+  if (!question || !answer || !evaluation) {
+    return res.status(400).json({ error: 'question, answer, and evaluation are required' });
+  }
+  try {
+    const result = await coachAnswer(question, answer, evaluation);
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to generate coaching feedback' });
+  }
 });
 
 // FR7 - Memory Agent + session history (Day 4)
