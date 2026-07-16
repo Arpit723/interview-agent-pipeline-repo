@@ -10,6 +10,17 @@ const { generateQuestions } = require('../agents/interviewerAgent');
 const { evaluateAnswer } = require('../agents/evaluatorAgent');
 const { coachAnswer } = require('../agents/coachAgent');
 
+const db = require('../db/init');
+
+const insertSession = db.prepare('INSERT INTO sessions (job_description) VALUES (?)');
+const insertQaPair = db.prepare(`
+  INSERT INTO qa_pairs
+    (session_id, question, question_type, answer, score_technical, score_structure, score_clarity, weak_areas)
+  VALUES
+    (@session_id, @question, @question_type, @answer, @score_technical, @score_structure, @score_clarity, @weak_areas)
+`);
+const updateQaPair = db.prepare('UPDATE qa_pairs SET feedback = ?, model_answer = ? WHERE id = ?');
+
 // FR2 - Interviewer Agent (Day 2)
 router.post('/questions', async (req, res) => {
   const { jobDescription } = req.body;
@@ -18,7 +29,8 @@ router.post('/questions', async (req, res) => {
   }
   try {
     const result = await generateQuestions(jobDescription);
-    return res.json(result);
+    const info = insertSession.run(jobDescription);
+    return res.json({ sessionId: info.lastInsertRowid, ...result });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to generate questions' });
@@ -27,13 +39,23 @@ router.post('/questions', async (req, res) => {
 
 // FR4 - Evaluator Agent (Day 2)
 router.post('/evaluate', async (req, res) => {
-  const { question, answer } = req.body;
-  if (!question || !answer) {
-    return res.status(400).json({ error: 'question and answer are required' });
+  const { sessionId, question, question_type, answer } = req.body;
+  if (!sessionId || !question || !question_type || !answer) {
+    return res.status(400).json({ error: 'sessionId, question, question_type, and answer are required' });
   }
   try {
     const result = await evaluateAnswer(question, answer);
-    return res.json(result);
+    const info = insertQaPair.run({
+      session_id: sessionId,
+      question,
+      question_type,
+      answer,
+      score_technical: result.scores.technical_accuracy,
+      score_structure: result.scores.structure,
+      score_clarity: result.scores.clarity,
+      weak_areas: JSON.stringify(result.weak_areas),
+    });
+    return res.json({ qaPairId: info.lastInsertRowid, ...result });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to evaluate answer' });
@@ -42,12 +64,13 @@ router.post('/evaluate', async (req, res) => {
 
 // FR5 - Coach Agent (Day 3)
 router.post('/coach', async (req, res) => {
-  const { question, answer, evaluation } = req.body;
-  if (!question || !answer || !evaluation) {
-    return res.status(400).json({ error: 'question, answer, and evaluation are required' });
+  const { question, answer, evaluation, qaPairId } = req.body;
+  if (!question || !answer || !evaluation || !qaPairId) {
+    return res.status(400).json({ error: 'question, answer, evaluation, and qaPairId are required' });
   }
   try {
     const result = await coachAnswer(question, answer, evaluation);
+    updateQaPair.run(JSON.stringify(result.feedback), result.model_answer, qaPairId);
     return res.json(result);
   } catch (err) {
     console.error(err);
