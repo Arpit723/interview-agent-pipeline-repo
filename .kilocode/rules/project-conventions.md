@@ -49,3 +49,34 @@ Read this before making any changes. These are locked conventions for the
 - Do not deploy or add hosting config — localhost only for this sprint.
 - Do not touch `server.js` unless the task explicitly requires a new
   route mount or middleware.
+
+## Error handling & responses
+- Each handler validates `req.body` first and returns
+  `400 { error: "<fields> are required" }` before doing any work.
+- Wrap agent + DB calls in one `try/catch`: `console.error(err)` server-side,
+  then return a generic `500 { error: "..." }`. Never leak stack traces or
+  GLM internals to the client.
+- Success shape stays consistent: agent results are returned directly, or
+  augmented with the generated DB id (e.g. `{ sessionId, ...result }`).
+
+## Database usage
+- Prepare statements **once at module load** and reuse them per request via
+  `.run()` / `.get()` — do not re-prepare inside handlers.
+- Always use bound parameters (`?` or `@named`); never string-concatenate SQL.
+- Arrays/objects (`weak_areas`, `feedback`) are stored as `TEXT` via
+  `JSON.stringify` and read back with `JSON.parse`.
+
+## Secrets & configuration
+- Never hardcode keys or tokens (`ZAI_API_KEY`, GitHub PATs, etc.) in source
+  or config files.
+- Secrets live in `.env` (loaded via dotenv) or shell env; MCP server config
+  may reference them with the `{env:VAR}` syntax instead of literal values.
+- Never commit `.env` or any secret-bearing files.
+
+## Git & verification
+- Never commit unless explicitly asked; stage only the intended files.
+- Commit messages use imperative mood and match the repo style
+  (e.g. `Add SQLite interview coach database`).
+- After edits, run `node --check` and `require()` the module to confirm it
+  loads before claiming success. No test framework this sprint — verify
+  endpoints manually (e.g. `curl` against localhost) when relevant.
