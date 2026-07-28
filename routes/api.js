@@ -23,6 +23,26 @@ const insertQaPair = db.prepare(`
 const updateQaPair = db.prepare('UPDATE qa_pairs SET feedback = ?, model_answer = ? WHERE id = ?');
 const getAllQaPairs = db.prepare('SELECT * FROM qa_pairs');
 
+function isValidEvaluation(evaluation) {
+  if (!evaluation || typeof evaluation !== 'object' || Array.isArray(evaluation)) {
+    return 'evaluation must be an object';
+  }
+  const { scores, weak_areas } = evaluation;
+  if (!scores || typeof scores !== 'object' || Array.isArray(scores)) {
+    return 'evaluation.scores must be an object';
+  }
+  for (const field of ['technical_accuracy', 'structure', 'clarity']) {
+    const value = scores[field];
+    if (typeof value !== 'number' || Number.isNaN(value) || value < 0 || value > 10) {
+      return `evaluation.scores.${field} must be a number between 0 and 10`;
+    }
+  }
+  if (!Array.isArray(weak_areas)) {
+    return 'evaluation.weak_areas must be an array';
+  }
+  return true;
+}
+
 // FR2 - Interviewer Agent (Day 2)
 router.post('/questions', async (req, res) => {
   const { jobDescription } = req.body;
@@ -44,6 +64,12 @@ router.post('/evaluate', async (req, res) => {
   const { sessionId, question, question_type, answer } = req.body;
   if (!sessionId || !question || !question_type || !answer) {
     return res.status(400).json({ error: 'sessionId, question, question_type, and answer are required' });
+  }
+  if (typeof question !== 'string' || question.trim() === '') {
+    return res.status(400).json({ error: 'question must be a non-empty string' });
+  }
+  if (typeof answer !== 'string' || answer.trim() === '') {
+    return res.status(400).json({ error: 'answer must be a non-empty string' });
   }
   try {
     const result = await evaluateAnswer(question, answer);
@@ -69,6 +95,10 @@ router.post('/coach', async (req, res) => {
   const { question, answer, evaluation, qaPairId } = req.body;
   if (!question || !answer || !evaluation || !qaPairId) {
     return res.status(400).json({ error: 'question, answer, evaluation, and qaPairId are required' });
+  }
+  const evaluationError = isValidEvaluation(evaluation);
+  if (evaluationError !== true) {
+    return res.status(400).json({ error: evaluationError });
   }
   try {
     const result = await coachAnswer(question, answer, evaluation);
