@@ -2,10 +2,599 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Interview Agent Pipeline</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interview Prep Coach</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f5f5;
+      color: #222;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 48px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 32px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 12px;
+      font-family: inherit;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: 2px solid #4a7dff;
+      border-color: #4a7dff;
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      margin-top: 16px;
+      padding: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      background: #4a7dff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #3a6ae8;
+    }
+
+    #setup-loading {
+      display: none;
+      margin-top: 16px;
+      text-align: center;
+      color: #555;
+    }
+
+    #screen-question {
+      display: none;
+    }
+
+    .question-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    #question-counter {
+      color: #555;
+      font-size: 0.9rem;
+    }
+
+    #question-type-badge {
+      display: inline-block;
+      background: #e8efff;
+      color: #4a7dff;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 999px;
+    }
+
+    #question-text {
+      font-size: 1.125rem;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    #answer-loading {
+      display: none;
+      margin-top: 16px;
+      text-align: center;
+      color: #555;
+    }
+
+    #screen-feedback {
+      display: none;
+    }
+
+    #screen-feedback h2 {
+      font-size: 1.5rem;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    #scores-display {
+      margin-bottom: 24px;
+    }
+
+    #scores-display div {
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    #weak-areas-display {
+      margin-bottom: 24px;
+    }
+
+    .chip {
+      display: inline-block;
+      background: #e8efff;
+      color: #4a7dff;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 999px;
+    }
+
+    #feedback-list {
+      padding-left: 20px;
+      margin-bottom: 24px;
+    }
+
+    #feedback-list li {
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    #model-answer-display {
+      background: #f5f7fa;
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 24px;
+    }
+
+    .mini-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 4px;
+    }
+
+    #screen-summary {
+      display: none;
+    }
+
+    #screen-summary h2 {
+      font-size: 1.5rem;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .qa-card {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .qa-question {
+      font-weight: 600;
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    .qa-scores {
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    .qa-weak-areas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    #screen-summary hr {
+      border: none;
+      border-top: 1px solid #eee;
+      margin: 24px 0;
+    }
+
+    #memory-summary h3 {
+      font-size: 1.125rem;
+      margin-bottom: 12px;
+    }
+
+    #memory-summary p {
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+  </style>
 </head>
 <body>
-  <h1>Interview Agent Pipeline</h1>
-  <p>UI comes on Day 6. Backend routes are live under /api - test with curl or Postman for now.</p>
+  <main id="screen-setup" class="container">
+    <h1>Interview Prep Coach</h1>
+
+    <label for="jd-input">Job Description</label>
+    <textarea id="jd-input" rows="6" placeholder="Paste job description here"></textarea>
+
+    <button id="generate-btn">Generate Questions</button>
+
+    <div id="setup-loading">Generating questions...</div>
+  </main>
+
+  <section id="screen-question" class="container">
+    <div class="question-header">
+      <div id="question-counter">Question 1 of 5</div>
+      <span id="question-type-badge">technical</span>
+    </div>
+
+    <p id="question-text">Question will appear here</p>
+
+    <textarea id="answer-input" rows="6" placeholder="Type your answer here"></textarea>
+
+    <button id="submit-answer-btn">Submit Answer</button>
+
+    <div id="answer-loading">Evaluating your answer...</div>
+  </section>
+
+  <section id="screen-feedback" class="container">
+    <h2>Feedback</h2>
+
+    <div id="scores-display">
+      <div>Technical Accuracy: -/10</div>
+      <div>Structure: -/10</div>
+      <div>Clarity: -/10</div>
+    </div>
+
+    <div id="weak-areas-display">
+      <span class="chip">weak area example</span>
+    </div>
+
+    <ul id="feedback-list">
+      <li>Feedback point will appear here</li>
+    </ul>
+
+    <div id="model-answer-display">
+      <span class="mini-label">Model Answer</span>
+      Model answer will appear here
+    </div>
+
+    <button id="next-question-btn">Next Question</button>
+  </section>
+
+  <section id="screen-summary" class="container">
+    <h2>Session Summary</h2>
+
+    <div id="summary-qa-list">
+      <div class="qa-card">
+        <p class="qa-question">Question recap will appear here</p>
+        <p class="qa-scores">Technical Accuracy: -/10 &middot; Structure: -/10 &middot; Clarity: -/10</p>
+        <div class="qa-weak-areas">
+          <span class="chip">weak area example</span>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <div id="memory-summary">
+      <h3>Your Progress</h3>
+      <p>Recurring weak areas: -</p>
+      <p>Trend: -</p>
+      <p>Recommendation: -</p>
+    </div>
+
+    <button id="restart-btn">Start New Session</button>
+  </section>
+
+  <script>
+    (function () {
+      "use strict";
+
+      let currentSessionId = null;
+      let currentQuestions = [];
+      let currentQuestionIndex = 0;
+      let currentQaPairId = null;
+      const sessionQaLog = [];
+
+      const screenSetup = document.getElementById("screen-setup");
+      const screenQuestion = document.getElementById("screen-question");
+      const screenFeedback = document.getElementById("screen-feedback");
+      const screenSummary = document.getElementById("screen-summary");
+      const setupLoading = document.getElementById("setup-loading");
+      const generateBtn = document.getElementById("generate-btn");
+      const jdInput = document.getElementById("jd-input");
+      const questionCounter = document.getElementById("question-counter");
+      const questionTypeBadge = document.getElementById("question-type-badge");
+      const questionText = document.getElementById("question-text");
+      const answerInput = document.getElementById("answer-input");
+      const answerLoading = document.getElementById("answer-loading");
+      const submitAnswerBtn = document.getElementById("submit-answer-btn");
+      const scoresDisplay = document.getElementById("scores-display");
+      const weakAreasDisplay = document.getElementById("weak-areas-display");
+      const feedbackList = document.getElementById("feedback-list");
+      const modelAnswerDisplay = document.getElementById("model-answer-display");
+      const nextQuestionBtn = document.getElementById("next-question-btn");
+      const summaryQaList = document.getElementById("summary-qa-list");
+      const memorySummary = document.getElementById("memory-summary");
+      const restartBtn = document.getElementById("restart-btn");
+
+      function show(el) {
+        el.style.display = "block";
+      }
+
+      function hide(el) {
+        el.style.display = "none";
+      }
+
+      function renderCurrentQuestion() {
+        const currentQuestion = currentQuestions[currentQuestionIndex];
+        questionCounter.textContent =
+          "Question " + (currentQuestionIndex + 1) + " of " + currentQuestions.length;
+        questionTypeBadge.textContent = currentQuestion.type;
+        questionText.textContent = currentQuestion.question;
+        answerInput.value = "";
+      }
+
+      function renderFeedback(evaluateResult, coachResult) {
+        scoresDisplay.innerHTML = "";
+
+        const scoreRows = [
+          ["Technical Accuracy", evaluateResult.scores.technical_accuracy],
+          ["Structure", evaluateResult.scores.structure],
+          ["Clarity", evaluateResult.scores.clarity]
+        ];
+
+        scoreRows.forEach(function (row) {
+          const rowEl = document.createElement("div");
+          rowEl.textContent = row[0] + ": " + row[1] + "/10";
+          scoresDisplay.appendChild(rowEl);
+        });
+
+        weakAreasDisplay.innerHTML = "";
+        (evaluateResult.weak_areas || []).forEach(function (area) {
+          const chip = document.createElement("span");
+          chip.className = "chip";
+          chip.textContent = area;
+          weakAreasDisplay.appendChild(chip);
+        });
+
+        feedbackList.innerHTML = "";
+        (coachResult.feedback || []).forEach(function (point) {
+          const li = document.createElement("li");
+          li.textContent = point;
+          feedbackList.appendChild(li);
+        });
+
+        modelAnswerDisplay.innerHTML = "";
+        const label = document.createElement("span");
+        label.className = "mini-label";
+        label.textContent = "Model Answer";
+        const modelText = document.createElement("p");
+        modelText.textContent = coachResult.model_answer;
+        modelAnswerDisplay.appendChild(label);
+        modelAnswerDisplay.appendChild(modelText);
+      }
+
+      async function renderSummary() {
+        summaryQaList.innerHTML = "";
+
+        sessionQaLog.forEach(function (item) {
+          const card = document.createElement("div");
+          card.className = "qa-card";
+
+          const questionEl = document.createElement("p");
+          questionEl.className = "qa-question";
+          questionEl.textContent = item.question;
+          card.appendChild(questionEl);
+
+          const scoresEl = document.createElement("p");
+          scoresEl.className = "qa-scores";
+          scoresEl.textContent =
+            "Technical Accuracy: " + item.scores.technical_accuracy +
+            "/10 \u00b7 Structure: " + item.scores.structure +
+            "/10 \u00b7 Clarity: " + item.scores.clarity + "/10";
+          card.appendChild(scoresEl);
+
+          const weakEl = document.createElement("div");
+          weakEl.className = "qa-weak-areas";
+          (item.weak_areas || []).forEach(function (area) {
+            const chip = document.createElement("span");
+            chip.className = "chip";
+            chip.textContent = area;
+            weakEl.appendChild(chip);
+          });
+          card.appendChild(weakEl);
+
+          summaryQaList.appendChild(card);
+        });
+
+        try {
+          const response = await fetch("/api/history");
+          if (!response.ok) {
+            throw new Error("Request failed (" + response.status + ")");
+          }
+
+          const data = await response.json();
+
+          memorySummary.innerHTML = "";
+
+          const heading = document.createElement("h3");
+          heading.textContent = "Your Progress";
+          memorySummary.appendChild(heading);
+
+          const weakLine = document.createElement("p");
+          weakLine.textContent = "Recurring weak areas: " +
+            (data.recurring_weak_areas || []).join(", ");
+          memorySummary.appendChild(weakLine);
+
+          const trendLine = document.createElement("p");
+          trendLine.textContent = "Trend: " + data.trend;
+          memorySummary.appendChild(trendLine);
+
+          const recLine = document.createElement("p");
+          recLine.textContent = "Recommendation: " + data.recommendation;
+          memorySummary.appendChild(recLine);
+        } catch (err) {
+          memorySummary.textContent = "Could not load progress summary";
+        }
+      }
+
+      hide(screenQuestion);
+      hide(screenFeedback);
+      hide(screenSummary);
+
+      generateBtn.addEventListener("click", async function () {
+        const jobDescription = jdInput.value.trim();
+
+        if (!jobDescription) {
+          alert("Please paste a job description");
+          return;
+        }
+
+        show(setupLoading);
+
+        try {
+          const response = await fetch("/api/questions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jobDescription: jobDescription })
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error("Request failed (" + response.status + "): " + errorText);
+          }
+
+          const data = await response.json();
+
+          currentSessionId = data.sessionId;
+          currentQuestions = Array.isArray(data.questions) ? data.questions : [];
+
+          console.log("Questions response:", data);
+
+          hide(setupLoading);
+          hide(screenSetup);
+          show(screenQuestion);
+          renderCurrentQuestion();
+        } catch (err) {
+          hide(setupLoading);
+          alert(err.message);
+        }
+      });
+
+      submitAnswerBtn.addEventListener("click", async function () {
+        const answer = answerInput.value.trim();
+
+        if (!answer) {
+          alert("Please write an answer");
+          return;
+        }
+
+        const currentQuestion = currentQuestions[currentQuestionIndex];
+
+        show(answerLoading);
+
+        try {
+          const evaluateResponse = await fetch("/api/evaluate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId: currentSessionId,
+              question: currentQuestion.question,
+              question_type: currentQuestion.type,
+              answer: answer
+            })
+          });
+
+          if (!evaluateResponse.ok) {
+            const errorText = await evaluateResponse.text();
+            throw new Error("Evaluate failed (" + evaluateResponse.status + "): " + errorText);
+          }
+
+          const evaluateData = await evaluateResponse.json();
+          currentQaPairId = evaluateData.qaPairId;
+
+          const coachResponse = await fetch("/api/coach", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              qaPairId: currentQaPairId,
+              question: currentQuestion.question,
+              answer: answer,
+              evaluation: {
+                scores: evaluateData.scores,
+                weak_areas: evaluateData.weak_areas
+              }
+            })
+          });
+
+          if (!coachResponse.ok) {
+            const errorText = await coachResponse.text();
+            throw new Error("Coach failed (" + coachResponse.status + "): " + errorText);
+          }
+
+          const coachData = await coachResponse.json();
+
+          console.log("Evaluate response:", evaluateData);
+          console.log("Coach response:", coachData);
+
+          hide(answerLoading);
+          hide(screenQuestion);
+          show(screenFeedback);
+          renderFeedback(evaluateData, coachData);
+          sessionQaLog.push({
+            question: currentQuestion.question,
+            scores: evaluateData.scores,
+            weak_areas: evaluateData.weak_areas
+          });
+        } catch (err) {
+          hide(answerLoading);
+          alert(err.message);
+        }
+      });
+
+      nextQuestionBtn.addEventListener("click", function () {
+        currentQuestionIndex = currentQuestionIndex + 1;
+
+        hide(screenFeedback);
+
+        if (currentQuestionIndex < currentQuestions.length) {
+          show(screenQuestion);
+          renderCurrentQuestion();
+        } else {
+          show(screenSummary);
+          console.log("session complete");
+          renderSummary();
+        }
+      });
+
+      restartBtn.addEventListener("click", function () {
+        window.location.reload();
+      });
+    })();
+  </script>
 </body>
 </html>
