@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Session History</title>
+  <style>
+    :root {
+      --bg: #FAFAF9;
+      --surface: #FFFFFF;
+      --text-primary: #1A1A1A;
+      --text-secondary: #6B6B6B;
+      --accent: #4F46E5;
+      --accent-hover: #4338CA;
+      --border: #E5E5E5;
+      --success: #16A34A;
+      --warning: #D97706;
+      --danger: #DC2626;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    .container {
+      width: calc(100% - 32px);
+      max-width: 600px;
+      margin: 40px auto;
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 32px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    ul {
+      padding-left: 20px;
+      margin-bottom: 24px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin-bottom: 24px;
+    }
+
+    .back-link {
+      display: inline-block;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .back-link:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>Session History</h1>
+
+    <div id="history-content">Loading session history...</div>
+
+    <a href="index.html" class="back-link">Back to app</a>
+  </main>
+
+  <script>
+    (async function () {
+      "use strict";
+
+      const historyContent = document.getElementById("history-content");
+
+      function addSection(labelText, buildContent) {
+        const label = document.createElement("div");
+        label.className = "section-label";
+        label.textContent = labelText;
+        historyContent.appendChild(label);
+        buildContent();
+      }
+
+      try {
+        const response = await fetch("/api/history");
+        if (!response.ok) {
+          throw new Error("Request failed (" + response.status + ")");
+        }
+
+        const data = await response.json();
+
+        historyContent.innerHTML = "";
+
+        if (data.message) {
+          const messageEl = document.createElement("p");
+          messageEl.textContent = data.message;
+          historyContent.appendChild(messageEl);
+          return;
+        }
+
+        addSection("Recurring Weak Areas", function () {
+          const list = document.createElement("ul");
+          (data.recurring_weak_areas || []).forEach(function (area) {
+            const li = document.createElement("li");
+            li.textContent = area;
+            list.appendChild(li);
+          });
+          historyContent.appendChild(list);
+        });
+
+        addSection("Trend", function () {
+          const trendEl = document.createElement("p");
+          trendEl.textContent = data.trend;
+          historyContent.appendChild(trendEl);
+        });
+
+        addSection("Recommendation", function () {
+          const recEl = document.createElement("p");
+          recEl.textContent = data.recommendation;
+          historyContent.appendChild(recEl);
+        });
+      } catch (err) {
+        historyContent.textContent = "Could not load session history";
+      }
+    })();
+  </script>
+</body>
+</html>

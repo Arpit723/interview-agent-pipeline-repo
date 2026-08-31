@@ -5,6 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Interview Prep Coach</title>
   <style>
+    :root {
+      --bg: #FAFAF9;
+      --surface: #FFFFFF;
+      --text-primary: #1A1A1A;
+      --text-secondary: #6B6B6B;
+      --accent: #4F46E5;
+      --accent-hover: #4338CA;
+      --border: #E5E5E5;
+      --success: #16A34A;
+      --warning: #D97706;
+      --danger: #DC2626;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -13,77 +28,163 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: #f5f5f5;
-      color: #222;
-      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    .top-nav {
       display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      padding: 48px 16px;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .top-nav-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    #history-link {
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-primary);
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    #history-link:hover {
+      border-color: var(--accent);
+      color: var(--accent);
     }
 
     .container {
-      width: 100%;
+      width: calc(100% - 32px);
       max-width: 600px;
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 6px;
+      margin: 40px auto;
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
       padding: 32px;
     }
 
     h1 {
-      font-size: 1.75rem;
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 28px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
       margin-bottom: 24px;
-      text-align: center;
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
     }
 
     label {
       display: block;
-      font-weight: 600;
+      font-size: 14px;
+      font-weight: 500;
       margin-bottom: 8px;
     }
 
-    textarea {
+    #jd-input,
+    #answer-input {
       width: 100%;
+      box-sizing: border-box;
       padding: 12px;
       font-family: inherit;
-      font-size: 1rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      font-size: 15px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
       resize: vertical;
     }
 
-    textarea:focus {
-      outline: 2px solid #4a7dff;
-      border-color: #4a7dff;
+    #jd-input:focus,
+    #answer-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
     }
 
-    button {
+    #generate-btn,
+    #submit-answer-btn,
+    #next-question-btn,
+    #restart-btn {
       display: block;
       width: 100%;
       margin-top: 16px;
-      padding: 12px;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #fff;
-      background: #4a7dff;
+      padding: 12px 24px;
+      font-size: 15px;
+      font-weight: 500;
+      color: #FFFFFF;
+      background: var(--accent);
       border: none;
-      border-radius: 4px;
+      border-radius: 8px;
       cursor: pointer;
+      transition: background 0.15s;
     }
 
-    button:hover {
-      background: #3a6ae8;
+    #generate-btn:hover,
+    #submit-answer-btn:hover,
+    #next-question-btn:hover,
+    #restart-btn:hover {
+      background: var(--accent-hover);
     }
 
-    #setup-loading {
+    .btn-loading {
+      position: relative;
+      color: transparent !important;
+      pointer-events: none;
+    }
+
+    .btn-loading::after {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      top: 50%;
+      left: 50%;
+      margin: -8px 0 0 -8px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: btn-spin 0.6s linear infinite;
+    }
+
+    @keyframes btn-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    textarea:disabled {
+      background: var(--bg, #FAFAF9);
+      color: var(--text-secondary, #6B6B6B);
+      cursor: not-allowed;
+    }
+
+    #setup-loading,
+    #answer-loading {
       display: none;
-      margin-top: 16px;
+      margin-top: 12px;
+      font-size: 14px;
+      color: var(--text-secondary);
       text-align: center;
-      color: #555;
     }
 
-    #screen-question {
+    #screen-question,
+    #screen-feedback,
+    #screen-summary {
       display: none;
     }
 
@@ -95,41 +196,24 @@
     }
 
     #question-counter {
-      color: #555;
-      font-size: 0.9rem;
+      font-size: 14px;
+      color: var(--text-secondary);
     }
 
-    #question-type-badge {
+    .badge {
       display: inline-block;
-      background: #e8efff;
-      color: #4a7dff;
-      font-size: 0.8rem;
-      font-weight: 600;
       padding: 4px 12px;
-      border-radius: 999px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #EEF2FF;
+      color: var(--accent);
     }
 
     #question-text {
-      font-size: 1.125rem;
-      line-height: 1.5;
+      font-size: 18px;
+      line-height: 1.6;
       margin-bottom: 24px;
-    }
-
-    #answer-loading {
-      display: none;
-      margin-top: 16px;
-      text-align: center;
-      color: #555;
-    }
-
-    #screen-feedback {
-      display: none;
-    }
-
-    #screen-feedback h2 {
-      font-size: 1.5rem;
-      margin-bottom: 24px;
-      text-align: center;
     }
 
     #scores-display {
@@ -137,22 +221,26 @@
     }
 
     #scores-display div {
-      padding: 8px 0;
-      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+      font-size: 15px;
+      border-bottom: 1px solid var(--border);
     }
 
     #weak-areas-display {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
       margin-bottom: 24px;
     }
 
     .chip {
       display: inline-block;
-      background: #e8efff;
-      color: #4a7dff;
-      font-size: 0.8rem;
-      font-weight: 600;
       padding: 4px 12px;
-      border-radius: 999px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #FEE2E2;
+      color: var(--danger);
     }
 
     #feedback-list {
@@ -162,50 +250,42 @@
 
     #feedback-list li {
       margin-bottom: 8px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     #model-answer-display {
-      background: #f5f7fa;
-      border-radius: 4px;
-      padding: 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
       margin-bottom: 24px;
     }
 
     .mini-label {
       display: block;
-      font-size: 0.8rem;
+      font-size: 12px;
       font-weight: 600;
-      color: #555;
-      margin-bottom: 4px;
-    }
-
-    #screen-summary {
-      display: none;
-    }
-
-    #screen-summary h2 {
-      font-size: 1.5rem;
-      margin-bottom: 24px;
-      text-align: center;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
     }
 
     .qa-card {
-      border: 1px solid #ddd;
-      border-radius: 6px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
       padding: 16px;
       margin-bottom: 12px;
     }
 
     .qa-question {
+      font-size: 15px;
       font-weight: 600;
       margin-bottom: 8px;
       line-height: 1.5;
     }
 
     .qa-scores {
-      font-size: 0.9rem;
-      color: #555;
+      font-size: 14px;
+      color: var(--text-secondary);
       margin-bottom: 8px;
     }
 
@@ -217,22 +297,35 @@
 
     #screen-summary hr {
       border: none;
-      border-top: 1px solid #eee;
+      border-top: 1px solid var(--border);
       margin: 24px 0;
-    }
-
-    #memory-summary h3 {
-      font-size: 1.125rem;
-      margin-bottom: 12px;
     }
 
     #memory-summary p {
       margin-bottom: 8px;
-      line-height: 1.5;
+      line-height: 1.6;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
     }
   </style>
 </head>
 <body>
+  <nav class="top-nav">
+    <span class="top-nav-title">Interview Prep Coach</span>
+    <a href="history.html" target="_blank" id="history-link">History</a>
+  </nav>
+
   <main id="screen-setup" class="container">
     <h1>Interview Prep Coach</h1>
 
@@ -247,7 +340,7 @@
   <section id="screen-question" class="container">
     <div class="question-header">
       <div id="question-counter">Question 1 of 5</div>
-      <span id="question-type-badge">technical</span>
+      <span id="question-type-badge" class="badge">technical</span>
     </div>
 
     <p id="question-text">Question will appear here</p>
@@ -343,10 +436,12 @@
 
       function show(el) {
         el.style.display = "block";
+        el.classList.add("fade-in");
       }
 
       function hide(el) {
         el.style.display = "none";
+        el.classList.remove("fade-in");
       }
 
       function renderCurrentQuestion() {
@@ -369,7 +464,12 @@
 
         scoreRows.forEach(function (row) {
           const rowEl = document.createElement("div");
-          rowEl.textContent = row[0] + ": " + row[1] + "/10";
+          rowEl.textContent = row[0] + ": ";
+          const scoreSpan = document.createElement("span");
+          scoreSpan.textContent = row[1] + "/10";
+          scoreSpan.style.color =
+            row[1] >= 7 ? "var(--success)" : row[1] >= 4 ? "var(--warning)" : "var(--danger)";
+          rowEl.appendChild(scoreSpan);
           scoresDisplay.appendChild(rowEl);
         });
 
@@ -474,6 +574,10 @@
           return;
         }
 
+        generateBtn.disabled = true;
+        generateBtn.classList.add("btn-loading");
+        jdInput.disabled = true;
+
         show(setupLoading);
 
         try {
@@ -502,6 +606,10 @@
         } catch (err) {
           hide(setupLoading);
           alert(err.message);
+        } finally {
+          generateBtn.disabled = false;
+          generateBtn.classList.remove("btn-loading");
+          jdInput.disabled = false;
         }
       });
 
@@ -514,6 +622,10 @@
         }
 
         const currentQuestion = currentQuestions[currentQuestionIndex];
+
+        submitAnswerBtn.disabled = true;
+        submitAnswerBtn.classList.add("btn-loading");
+        answerInput.disabled = true;
 
         show(answerLoading);
 
@@ -573,6 +685,10 @@
         } catch (err) {
           hide(answerLoading);
           alert(err.message);
+        } finally {
+          submitAnswerBtn.disabled = false;
+          submitAnswerBtn.classList.remove("btn-loading");
+          answerInput.disabled = false;
         }
       });
 
