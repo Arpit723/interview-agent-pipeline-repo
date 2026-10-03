@@ -81,6 +81,103 @@
       color: var(--accent-hover);
       text-decoration: underline;
     }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 8px 0 16px;
+    }
+
+    .session-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .session-label {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.5;
+      margin-bottom: 2px;
+    }
+
+    .session-date {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .qa-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .qa-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .qa-card p {
+      margin-bottom: 8px;
+    }
+
+    .qa-card p:last-child {
+      margin-bottom: 0;
+    }
+
+    .qa-question {
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    .qa-answer {
+      font-style: italic;
+      background: var(--bg);
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+
+    .qa-scores {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .qa-weak-areas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #FEE2E2;
+      color: var(--danger);
+    }
+
+    .qa-card ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .qa-card li {
+      margin-bottom: 6px;
+    }
+
+    .mini-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
   </style>
 </head>
 <body>
@@ -88,6 +185,8 @@
     <h1>Session History</h1>
 
     <div id="history-content">Loading session history...</div>
+
+    <div id="sessions-list"></div>
 
     <a href="index.html" class="back-link">Back to app</a>
   </main>
@@ -97,6 +196,7 @@
       "use strict";
 
       const historyContent = document.getElementById("history-content");
+      const sessionsList = document.getElementById("sessions-list");
 
       function addSection(labelText, buildContent) {
         const label = document.createElement("div");
@@ -106,6 +206,114 @@
         buildContent();
       }
 
+      function scoreColor(value) {
+        return value >= 7 ? "var(--success)" : value >= 4 ? "var(--warning)" : "var(--danger)";
+      }
+
+      function buildQaCard(pair) {
+        const card = document.createElement("div");
+        card.className = "qa-card";
+
+        const questionEl = document.createElement("p");
+        questionEl.className = "qa-question";
+        questionEl.textContent = pair.question;
+        card.appendChild(questionEl);
+
+        const answerEl = document.createElement("p");
+        answerEl.className = "qa-answer";
+        answerEl.textContent = pair.answer;
+        card.appendChild(answerEl);
+
+        const scoresEl = document.createElement("p");
+        scoresEl.className = "qa-scores";
+        const scoreRows = [
+          ["Technical Accuracy", pair.score_technical],
+          ["Structure", pair.score_structure],
+          ["Clarity", pair.score_clarity]
+        ];
+        scoreRows.forEach(function (row, index) {
+          if (index > 0) {
+            scoresEl.appendChild(document.createTextNode(" \u00b7 "));
+          }
+          scoresEl.appendChild(document.createTextNode(row[0] + ": "));
+          const scoreSpan = document.createElement("span");
+          scoreSpan.textContent = row[1] + "/10";
+          scoreSpan.style.color = scoreColor(row[1]);
+          scoresEl.appendChild(scoreSpan);
+        });
+        card.appendChild(scoresEl);
+
+        if ((pair.weak_areas || []).length > 0) {
+          const weakEl = document.createElement("div");
+          weakEl.className = "qa-weak-areas";
+          pair.weak_areas.forEach(function (area) {
+            const tag = document.createElement("span");
+            tag.className = "tag";
+            tag.textContent = area;
+            weakEl.appendChild(tag);
+          });
+          card.appendChild(weakEl);
+        }
+
+        if ((pair.feedback || []).length > 0) {
+          const feedbackEl = document.createElement("ul");
+          pair.feedback.forEach(function (point) {
+            const li = document.createElement("li");
+            li.textContent = point;
+            feedbackEl.appendChild(li);
+          });
+          card.appendChild(feedbackEl);
+        }
+
+        if (pair.model_answer) {
+          const modelLabel = document.createElement("div");
+          modelLabel.className = "mini-label";
+          modelLabel.textContent = "Model Answer";
+          card.appendChild(modelLabel);
+
+          const modelEl = document.createElement("p");
+          modelEl.textContent = pair.model_answer;
+          card.appendChild(modelEl);
+        }
+
+        return card;
+      }
+
+      function renderSessions(sessions) {
+        sessionsList.innerHTML = "";
+
+        const ordered = (sessions || []).slice().reverse();
+        if (ordered.length === 0) {
+          return;
+        }
+
+        const heading = document.createElement("h2");
+        heading.textContent = "Past Sessions";
+        sessionsList.appendChild(heading);
+
+        ordered.forEach(function (session) {
+          const block = document.createElement("div");
+          block.className = "session-block";
+
+          const label = document.createElement("div");
+          label.className = "session-label";
+          const jd = session.jobDescription || "";
+          label.textContent = jd.length > 80 ? jd.slice(0, 80) + "..." : jd;
+          block.appendChild(label);
+
+          const date = document.createElement("div");
+          date.className = "session-date";
+          date.textContent = session.createdAt;
+          block.appendChild(date);
+
+          (session.qaPairs || []).forEach(function (pair) {
+            block.appendChild(buildQaCard(pair));
+          });
+
+          sessionsList.appendChild(block);
+        });
+      }
+
       try {
         const response = await fetch("/api/history");
         if (!response.ok) {
@@ -113,6 +321,7 @@
         }
 
         const data = await response.json();
+        const summary = data.summary || {};
 
         historyContent.innerHTML = "";
 
@@ -125,7 +334,7 @@
 
         addSection("Recurring Weak Areas", function () {
           const list = document.createElement("ul");
-          (data.recurring_weak_areas || []).forEach(function (area) {
+          (summary.recurring_weak_areas || []).forEach(function (area) {
             const li = document.createElement("li");
             li.textContent = area;
             list.appendChild(li);
@@ -135,15 +344,17 @@
 
         addSection("Trend", function () {
           const trendEl = document.createElement("p");
-          trendEl.textContent = data.trend;
+          trendEl.textContent = summary.trend;
           historyContent.appendChild(trendEl);
         });
 
         addSection("Recommendation", function () {
           const recEl = document.createElement("p");
-          recEl.textContent = data.recommendation;
+          recEl.textContent = summary.recommendation;
           historyContent.appendChild(recEl);
         });
+
+        renderSessions(data.sessions || []);
       } catch (err) {
         historyContent.textContent = "Could not load session history";
       }

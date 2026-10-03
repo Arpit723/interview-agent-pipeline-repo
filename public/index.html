@@ -173,6 +173,58 @@
       cursor: not-allowed;
     }
 
+    #mic-btn {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    #mic-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    #mic-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .recording {
+      background: var(--danger, #DC2626) !important;
+      animation: pulse 1.2s infinite;
+    }
+
+    .recording,
+    .recording:hover {
+      color: #FFFFFF;
+      border-color: var(--danger, #DC2626);
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.6;
+      }
+    }
+
+    .mic-message {
+      display: none;
+      margin-top: 4px;
+      font-size: 13px;
+      color: var(--danger);
+    }
+
     #setup-loading,
     #answer-loading {
       display: none;
@@ -366,6 +418,8 @@
 
     <textarea id="answer-input" rows="6" placeholder="Type your answer here"></textarea>
 
+    <button id="mic-btn">🎤 Speak Answer</button>
+
     <button id="submit-answer-btn">Submit Answer</button>
 
     <div id="answer-loading">Evaluating your answer...</div>
@@ -445,6 +499,7 @@
       const answerInput = document.getElementById("answer-input");
       const answerLoading = document.getElementById("answer-loading");
       const submitAnswerBtn = document.getElementById("submit-answer-btn");
+      const micBtn = document.getElementById("mic-btn");
       const scoresDisplay = document.getElementById("scores-display");
       const weakAreasDisplay = document.getElementById("weak-areas-display");
       const feedbackList = document.getElementById("feedback-list");
@@ -489,6 +544,93 @@
       function hideError(screenId) {
         const banner = document.querySelector("#" + screenId + " .error-banner");
         hide(banner);
+      }
+
+      const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let recognition = null;
+      let isListening = false;
+
+      const micMessage = document.createElement("div");
+      micMessage.className = "mic-message";
+      micBtn.insertAdjacentElement("afterend", micMessage);
+
+      let micMessageTimer = null;
+
+      function showMicMessage(text) {
+        micMessage.textContent = text;
+        micMessage.style.display = "block";
+        clearTimeout(micMessageTimer);
+        micMessageTimer = setTimeout(function () {
+          micMessage.style.display = "none";
+        }, 3000);
+      }
+
+      function hideMicMessage() {
+        clearTimeout(micMessageTimer);
+        micMessage.style.display = "none";
+      }
+
+      function resetMicButton() {
+        isListening = false;
+        micBtn.textContent = "🎤 Speak Answer";
+        micBtn.classList.remove("recording");
+      }
+
+      function stopMic() {
+        if (recognition && isListening) {
+          recognition.stop();
+        }
+        resetMicButton();
+      }
+
+      if (typeof SpeechRecognitionCtor !== "function") {
+        micBtn.disabled = true;
+        micBtn.textContent = "Speech input not supported in this browser";
+      } else {
+        recognition = new SpeechRecognitionCtor();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
+
+        recognition.onresult = function (event) {
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const result = event.results[i];
+            if (result.isFinal) {
+              const transcript = result[0].transcript.trim();
+              if (transcript) {
+                const current = answerInput.value.trim();
+                answerInput.value = current ? current + " " + transcript : transcript;
+              }
+            }
+          }
+        };
+
+        recognition.onerror = function () {
+          resetMicButton();
+          showMicMessage("Couldn't hear you, try again");
+        };
+
+        recognition.onend = function () {
+          resetMicButton();
+        };
+
+        micBtn.addEventListener("click", function () {
+          if (isListening) {
+            stopMic();
+            hideMicMessage();
+            return;
+          }
+
+          try {
+            recognition.start();
+            isListening = true;
+            micBtn.textContent = "⏹ Stop Recording";
+            micBtn.classList.add("recording");
+            hideMicMessage();
+          } catch (err) {
+            resetMicButton();
+          }
+        });
       }
 
       function renderCurrentQuestion() {
@@ -585,6 +727,7 @@
           }
 
           const data = await response.json();
+          const summary = data.summary || {};
 
           memorySummary.innerHTML = "";
 
@@ -594,15 +737,15 @@
 
           const weakLine = document.createElement("p");
           weakLine.textContent = "Recurring weak areas: " +
-            (data.recurring_weak_areas || []).join(", ");
+            (summary.recurring_weak_areas || []).join(", ");
           memorySummary.appendChild(weakLine);
 
           const trendLine = document.createElement("p");
-          trendLine.textContent = "Trend: " + data.trend;
+          trendLine.textContent = "Trend: " + summary.trend;
           memorySummary.appendChild(trendLine);
 
           const recLine = document.createElement("p");
-          recLine.textContent = "Recommendation: " + data.recommendation;
+          recLine.textContent = "Recommendation: " + summary.recommendation;
           memorySummary.appendChild(recLine);
         } catch (err) {
           memorySummary.textContent = "Could not load progress summary";
@@ -668,6 +811,7 @@
 
       submitAnswerBtn.addEventListener("click", async function () {
         hideError("screen-question");
+        stopMic();
 
         const answer = answerInput.value.trim();
 

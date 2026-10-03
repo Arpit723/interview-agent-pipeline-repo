@@ -22,6 +22,7 @@ const insertQaPair = db.prepare(`
 `);
 const updateQaPair = db.prepare('UPDATE qa_pairs SET feedback = ?, model_answer = ? WHERE id = ?');
 const getAllQaPairs = db.prepare('SELECT * FROM qa_pairs');
+const getSessionById = db.prepare('SELECT * FROM sessions WHERE id = ?');
 
 function isValidEvaluation(evaluation) {
   if (!evaluation || typeof evaluation !== 'object' || Array.isArray(evaluation)) {
@@ -41,6 +42,18 @@ function isValidEvaluation(evaluation) {
     return 'evaluation.weak_areas must be an array';
   }
   return true;
+}
+
+function parseJsonArray(value) {
+  if (value === null || value === undefined) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 // FR2 - Interviewer Agent (Day 2)
@@ -115,7 +128,7 @@ router.get('/history', async (req, res) => {
   try {
     const rows = getAllQaPairs.all();
     if (rows.length === 0) {
-      return res.json({ message: 'No sessions yet' });
+      return res.json({ message: 'No sessions yet', sessions: [] });
     }
     const pastSessions = rows.map((row) => ({
       scores: {
@@ -126,7 +139,36 @@ router.get('/history', async (req, res) => {
       weak_areas: JSON.parse(row.weak_areas),
     }));
     const result = await summarizeProgress(pastSessions);
-    return res.json(result);
+
+    const sessionsById = new Map();
+
+    rows.forEach((row) => {
+      if (!sessionsById.has(row.session_id)) {
+        const session = getSessionById.get(row.session_id);
+        sessionsById.set(row.session_id, {
+          sessionId: row.session_id,
+          jobDescription: session ? session.job_description : null,
+          createdAt: session ? session.created_at : null,
+          qaPairs: [],
+        });
+      }
+      sessionsById.get(row.session_id).qaPairs.push({
+        question: row.question,
+        question_type: row.question_type,
+        answer: row.answer,
+        score_technical: row.score_technical,
+        score_structure: row.score_structure,
+        score_clarity: row.score_clarity,
+        weak_areas: parseJsonArray(row.weak_areas),
+        feedback: parseJsonArray(row.feedback),
+        model_answer: row.model_answer,
+      });
+    });
+
+    return res.json({
+      summary: result,
+      sessions: Array.from(sessionsById.values()),
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to summarize progress' });
