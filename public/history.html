@@ -88,6 +88,46 @@
       margin: 8px 0 16px;
     }
 
+    #analyze-btn {
+      display: block;
+      width: 100%;
+      margin-top: 4px;
+      margin-bottom: 24px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--accent);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    #analyze-btn:hover {
+      border-color: var(--accent);
+    }
+
+    #analyze-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    #analyze-loading {
+      display: none;
+      margin-top: 8px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    .progress-meta {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
     .session-block {
       background: var(--bg);
       border: 1px solid var(--border);
@@ -186,17 +226,30 @@
 
     <div id="history-content">Loading session history...</div>
 
+    <button id="analyze-btn">Analyze my progress</button>
+    <div id="analyze-loading">Analyzing your progress...</div>
+
     <div id="sessions-list"></div>
 
     <a href="index.html" class="back-link">Back to app</a>
   </main>
 
   <script>
-    (async function () {
+    (function () {
       "use strict";
 
       const historyContent = document.getElementById("history-content");
       const sessionsList = document.getElementById("sessions-list");
+      const analyzeBtn = document.getElementById("analyze-btn");
+      const analyzeLoading = document.getElementById("analyze-loading");
+
+      function show(el) {
+        el.style.display = "block";
+      }
+
+      function hide(el) {
+        el.style.display = "none";
+      }
 
       function addSection(labelText, buildContent) {
         const label = document.createElement("div");
@@ -210,127 +263,19 @@
         return value >= 7 ? "var(--success)" : value >= 4 ? "var(--warning)" : "var(--danger)";
       }
 
-      function buildQaCard(pair) {
-        const card = document.createElement("div");
-        card.className = "qa-card";
-
-        const questionEl = document.createElement("p");
-        questionEl.className = "qa-question";
-        questionEl.textContent = pair.question;
-        card.appendChild(questionEl);
-
-        const answerEl = document.createElement("p");
-        answerEl.className = "qa-answer";
-        answerEl.textContent = pair.answer;
-        card.appendChild(answerEl);
-
-        const scoresEl = document.createElement("p");
-        scoresEl.className = "qa-scores";
-        const scoreRows = [
-          ["Technical Accuracy", pair.score_technical],
-          ["Structure", pair.score_structure],
-          ["Clarity", pair.score_clarity]
-        ];
-        scoreRows.forEach(function (row, index) {
-          if (index > 0) {
-            scoresEl.appendChild(document.createTextNode(" \u00b7 "));
-          }
-          scoresEl.appendChild(document.createTextNode(row[0] + ": "));
-          const scoreSpan = document.createElement("span");
-          scoreSpan.textContent = row[1] + "/10";
-          scoreSpan.style.color = scoreColor(row[1]);
-          scoresEl.appendChild(scoreSpan);
-        });
-        card.appendChild(scoresEl);
-
-        if ((pair.weak_areas || []).length > 0) {
-          const weakEl = document.createElement("div");
-          weakEl.className = "qa-weak-areas";
-          pair.weak_areas.forEach(function (area) {
-            const tag = document.createElement("span");
-            tag.className = "tag";
-            tag.textContent = area;
-            weakEl.appendChild(tag);
-          });
-          card.appendChild(weakEl);
-        }
-
-        if ((pair.feedback || []).length > 0) {
-          const feedbackEl = document.createElement("ul");
-          pair.feedback.forEach(function (point) {
-            const li = document.createElement("li");
-            li.textContent = point;
-            feedbackEl.appendChild(li);
-          });
-          card.appendChild(feedbackEl);
-        }
-
-        if (pair.model_answer) {
-          const modelLabel = document.createElement("div");
-          modelLabel.className = "mini-label";
-          modelLabel.textContent = "Model Answer";
-          card.appendChild(modelLabel);
-
-          const modelEl = document.createElement("p");
-          modelEl.textContent = pair.model_answer;
-          card.appendChild(modelEl);
-        }
-
-        return card;
-      }
-
-      function renderSessions(sessions) {
-        sessionsList.innerHTML = "";
-
-        const ordered = (sessions || []).slice().reverse();
-        if (ordered.length === 0) {
-          return;
-        }
-
-        const heading = document.createElement("h2");
-        heading.textContent = "Past Sessions";
-        sessionsList.appendChild(heading);
-
-        ordered.forEach(function (session) {
-          const block = document.createElement("div");
-          block.className = "session-block";
-
-          const label = document.createElement("div");
-          label.className = "session-label";
-          const jd = session.jobDescription || "";
-          label.textContent = jd.length > 80 ? jd.slice(0, 80) + "..." : jd;
-          block.appendChild(label);
-
-          const date = document.createElement("div");
-          date.className = "session-date";
-          date.textContent = session.createdAt;
-          block.appendChild(date);
-
-          (session.qaPairs || []).forEach(function (pair) {
-            block.appendChild(buildQaCard(pair));
-          });
-
-          sessionsList.appendChild(block);
-        });
-      }
-
-      try {
-        const response = await fetch("/api/history");
-        if (!response.ok) {
-          throw new Error("Request failed (" + response.status + ")");
-        }
-
-        const data = await response.json();
-        const summary = data.summary || {};
-
+      function renderProgress(progress) {
         historyContent.innerHTML = "";
 
-        if (data.message) {
-          const messageEl = document.createElement("p");
-          messageEl.textContent = data.message;
-          historyContent.appendChild(messageEl);
+        if (!progress || !progress.summary) {
+          const empty = document.createElement("p");
+          empty.textContent = progress && progress.message
+            ? progress.message
+            : "No progress analysis yet - run one below.";
+          historyContent.appendChild(empty);
           return;
         }
+
+        const summary = progress.summary;
 
         addSection("Recurring Weak Areas", function () {
           const list = document.createElement("ul");
@@ -354,10 +299,172 @@
           historyContent.appendChild(recEl);
         });
 
-        renderSessions(data.sessions || []);
-      } catch (err) {
-        historyContent.textContent = "Could not load session history";
+        const meta = document.createElement("p");
+        meta.className = "progress-meta";
+        meta.textContent = "Last analyzed: " + (progress.computedAt || "unknown") +
+          (progress.stale ? " (new answers since - refresh for an update)" : "");
+        historyContent.appendChild(meta);
       }
+
+      function buildQuestionCard(q) {
+        const card = document.createElement("div");
+        card.className = "qa-card";
+
+        const questionEl = document.createElement("p");
+        questionEl.className = "qa-question";
+        questionEl.textContent = (q.position ? q.position + ". " : "") + q.question;
+        card.appendChild(questionEl);
+
+        if (!q.answered) {
+          const skippedEl = document.createElement("p");
+          skippedEl.className = "qa-scores";
+          skippedEl.textContent = "Not answered";
+          card.appendChild(skippedEl);
+          return card;
+        }
+
+        const answerEl = document.createElement("p");
+        answerEl.className = "qa-answer";
+        answerEl.textContent = q.answer;
+        card.appendChild(answerEl);
+
+        const scoresEl = document.createElement("p");
+        scoresEl.className = "qa-scores";
+        const scoreRows = [
+          ["Technical Accuracy", q.scores.technical_accuracy],
+          ["Structure", q.scores.structure],
+          ["Clarity", q.scores.clarity]
+        ];
+        scoreRows.forEach(function (row, index) {
+          if (index > 0) {
+            scoresEl.appendChild(document.createTextNode(" \u00b7 "));
+          }
+          scoresEl.appendChild(document.createTextNode(row[0] + ": "));
+          const scoreSpan = document.createElement("span");
+          scoreSpan.textContent = row[1] + "/10";
+          scoreSpan.style.color = scoreColor(row[1]);
+          scoresEl.appendChild(scoreSpan);
+        });
+        card.appendChild(scoresEl);
+
+        if ((q.weak_areas || []).length > 0) {
+          const weakEl = document.createElement("div");
+          weakEl.className = "qa-weak-areas";
+          q.weak_areas.forEach(function (area) {
+            const tag = document.createElement("span");
+            tag.className = "tag";
+            tag.textContent = area;
+            weakEl.appendChild(tag);
+          });
+          card.appendChild(weakEl);
+        }
+
+        if ((q.feedback || []).length > 0) {
+          const feedbackEl = document.createElement("ul");
+          q.feedback.forEach(function (point) {
+            const li = document.createElement("li");
+            li.textContent = point;
+            feedbackEl.appendChild(li);
+          });
+          card.appendChild(feedbackEl);
+        }
+
+        if (q.model_answer) {
+          const modelLabel = document.createElement("div");
+          modelLabel.className = "mini-label";
+          modelLabel.textContent = "Model Answer";
+          card.appendChild(modelLabel);
+
+          const modelEl = document.createElement("p");
+          modelEl.textContent = q.model_answer;
+          card.appendChild(modelEl);
+        }
+
+        return card;
+      }
+
+      function renderSessions(sessions) {
+        sessionsList.innerHTML = "";
+
+        if ((sessions || []).length === 0) {
+          return;
+        }
+
+        const heading = document.createElement("h2");
+        heading.textContent = "Past Sessions";
+        sessionsList.appendChild(heading);
+
+        sessions.forEach(function (session) {
+          const block = document.createElement("div");
+          block.className = "session-block";
+
+          const label = document.createElement("div");
+          label.className = "session-label";
+          const jd = session.jobDescription || "";
+          label.textContent = jd.length > 80 ? jd.slice(0, 80) + "..." : jd;
+          block.appendChild(label);
+
+          const date = document.createElement("div");
+          date.className = "session-date";
+          date.textContent = session.createdAt;
+          block.appendChild(date);
+
+          (session.questions || []).forEach(function (q) {
+            block.appendChild(buildQuestionCard(q));
+          });
+
+          sessionsList.appendChild(block);
+        });
+      }
+
+      analyzeBtn.addEventListener("click", async function () {
+        analyzeBtn.disabled = true;
+        analyzeBtn.textContent = "Analyzing...";
+        show(analyzeLoading);
+
+        try {
+          const response = await fetch("/api/progress");
+          if (!response.ok) {
+            throw new Error("Request failed (" + response.status + ")");
+          }
+
+          const data = await response.json();
+          renderProgress(data);
+        } catch (err) {
+          console.error("Progress analysis failed:", err);
+          historyContent.textContent = "Could not analyze progress - please try again";
+        } finally {
+          hide(analyzeLoading);
+          analyzeBtn.disabled = false;
+          analyzeBtn.textContent = "Refresh Analysis";
+        }
+      });
+
+      (async function load() {
+        try {
+          const response = await fetch("/api/history");
+          if (!response.ok) {
+            throw new Error("Request failed (" + response.status + ")");
+          }
+
+          const data = await response.json();
+
+          if (data.message) {
+            historyContent.textContent = data.message;
+            hide(analyzeBtn);
+            return;
+          }
+
+          renderProgress(data.progress);
+          if (data.progress && data.progress.summary) {
+            analyzeBtn.textContent = "Refresh Analysis";
+          }
+          renderSessions(data.sessions);
+        } catch (err) {
+          historyContent.textContent = "Could not load session history";
+          hide(analyzeBtn);
+        }
+      })();
     })();
   </script>
 </body>

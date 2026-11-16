@@ -119,6 +119,7 @@
     #generate-btn,
     #submit-answer-btn,
     #next-question-btn,
+    #analyze-btn,
     #restart-btn {
       display: block;
       width: 100%;
@@ -137,6 +138,7 @@
     #generate-btn:hover,
     #submit-answer-btn:hover,
     #next-question-btn:hover,
+    #analyze-btn:hover,
     #restart-btn:hover {
       background: var(--accent-hover);
     }
@@ -226,7 +228,8 @@
     }
 
     #setup-loading,
-    #answer-loading {
+    #answer-loading,
+    #analyze-loading {
       display: none;
       margin-top: 12px;
       font-size: 14px;
@@ -468,10 +471,11 @@
 
     <div id="memory-summary">
       <h3>Your Progress</h3>
-      <p>Recurring weak areas: -</p>
-      <p>Trend: -</p>
-      <p>Recommendation: -</p>
+      <p>See your recurring weak areas, score trend, and what to focus on next across all your sessions.</p>
     </div>
+
+    <button id="analyze-btn">Analyze my progress</button>
+    <div id="analyze-loading">Analyzing your progress...</div>
 
     <button id="restart-btn">Start New Session</button>
   </section>
@@ -484,6 +488,9 @@
       let currentQuestions = [];
       let currentQuestionIndex = 0;
       let currentQaPairId = null;
+      // Evaluate response for the current submit attempt. Kept across retries
+      // so a failed coach call doesn't re-run (and re-pay for) evaluation.
+      let lastEvaluateResult = null;
       const sessionQaLog = [];
 
       const screenSetup = document.getElementById("screen-setup");
@@ -507,6 +514,8 @@
       const nextQuestionBtn = document.getElementById("next-question-btn");
       const summaryQaList = document.getElementById("summary-qa-list");
       const memorySummary = document.getElementById("memory-summary");
+      const analyzeBtn = document.getElementById("analyze-btn");
+      const analyzeLoading = document.getElementById("analyze-loading");
       const restartBtn = document.getElementById("restart-btn");
 
       function show(el) {
@@ -634,6 +643,7 @@
       }
 
       function renderCurrentQuestion() {
+        lastEvaluateResult = null;
         const currentQuestion = currentQuestions[currentQuestionIndex];
         questionCounter.textContent =
           "Question " + (currentQuestionIndex + 1) + " of " + currentQuestions.length;
@@ -687,7 +697,7 @@
         modelAnswerDisplay.appendChild(modelText);
       }
 
-      async function renderSummary() {
+      function renderSummary() {
         summaryQaList.innerHTML = "";
 
         sessionQaLog.forEach(function (item) {
@@ -719,38 +729,58 @@
 
           summaryQaList.appendChild(card);
         });
+      }
+
+      function renderProgress(data) {
+        memorySummary.innerHTML = "";
+
+        const heading = document.createElement("h3");
+        heading.textContent = "Your Progress";
+        memorySummary.appendChild(heading);
+
+        if (!data.summary) {
+          const empty = document.createElement("p");
+          empty.textContent = data.message || "No answers to analyze yet";
+          memorySummary.appendChild(empty);
+          return;
+        }
+
+        const weakLine = document.createElement("p");
+        weakLine.textContent = "Recurring weak areas: " +
+          (data.summary.recurring_weak_areas || []).join(", ");
+        memorySummary.appendChild(weakLine);
+
+        const trendLine = document.createElement("p");
+        trendLine.textContent = "Trend: " + data.summary.trend;
+        memorySummary.appendChild(trendLine);
+
+        const recLine = document.createElement("p");
+        recLine.textContent = "Recommendation: " + data.summary.recommendation;
+        memorySummary.appendChild(recLine);
+      }
+
+      analyzeBtn.addEventListener("click", async function () {
+        analyzeBtn.disabled = true;
+        analyzeBtn.classList.add("btn-loading");
+        show(analyzeLoading);
 
         try {
-          const response = await fetch("/api/history");
+          const response = await fetch("/api/progress");
           if (!response.ok) {
             throw new Error("Request failed (" + response.status + ")");
           }
 
           const data = await response.json();
-          const summary = data.summary || {};
-
-          memorySummary.innerHTML = "";
-
-          const heading = document.createElement("h3");
-          heading.textContent = "Your Progress";
-          memorySummary.appendChild(heading);
-
-          const weakLine = document.createElement("p");
-          weakLine.textContent = "Recurring weak areas: " +
-            (summary.recurring_weak_areas || []).join(", ");
-          memorySummary.appendChild(weakLine);
-
-          const trendLine = document.createElement("p");
-          trendLine.textContent = "Trend: " + summary.trend;
-          memorySummary.appendChild(trendLine);
-
-          const recLine = document.createElement("p");
-          recLine.textContent = "Recommendation: " + summary.recommendation;
-          memorySummary.appendChild(recLine);
+          renderProgress(data);
         } catch (err) {
-          memorySummary.textContent = "Could not load progress summary";
+          console.error("Progress analysis failed:", err);
+          memorySummary.textContent = "Could not load progress summary - please try again";
+        } finally {
+          hide(analyzeLoading);
+          analyzeBtn.disabled = false;
+          analyzeBtn.classList.remove("btn-loading");
         }
-      }
+      });
 
       hide(screenQuestion);
       hide(screenFeedback);
@@ -829,23 +859,29 @@
         show(answerLoading);
 
         try {
-          const evaluateResponse = await fetch("/api/evaluate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId: currentSessionId,
-              question: currentQuestion.question,
-              question_type: currentQuestion.type,
-              answer: answer
-            })
-          });
+          // The server upserts by questionId, so a re-submit can't create a
+          // duplicate row; skipping evaluate on retry also avoids the extra
+          // LLM call.
+          let evaluateData = lastEvaluateResult;
+          if (!evaluateData) {
+            const evaluateResponse = await fetch("/api/evaluate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                questionId: currentQuestion.id,
+                answer: answer
+              })
+            });
 
-          if (!evaluateResponse.ok) {
-            const errorText = await evaluateResponse.text();
-            throw new Error("Evaluate failed (" + evaluateResponse.status + "): " + errorText);
+            if (!evaluateResponse.ok) {
+              const errorText = await evaluateResponse.text();
+              throw new Error("Evaluate failed (" + evaluateResponse.status + "): " + errorText);
+            }
+
+            evaluateData = await evaluateResponse.json();
+            lastEvaluateResult = evaluateData;
           }
 
-          const evaluateData = await evaluateResponse.json();
           currentQaPairId = evaluateData.qaPairId;
 
           const coachResponse = await fetch("/api/coach", {
@@ -871,6 +907,8 @@
 
           console.log("Evaluate response:", evaluateData);
           console.log("Coach response:", coachData);
+
+          lastEvaluateResult = null;
 
           hide(answerLoading);
           hide(screenQuestion);
